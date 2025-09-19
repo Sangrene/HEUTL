@@ -1,0 +1,10 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, sqlx::FromRow, Debug, PartialEq, Eq)]
+pub struct EntitySubscription {
+    pub id: String,
+    pub entity_sharing_id: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub connected_app_id: String,
+}

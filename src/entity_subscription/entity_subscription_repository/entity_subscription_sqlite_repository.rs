@@ -23,14 +23,16 @@ impl<'a> EntitySubscriptionRepository for EntitySubscriptionSQLiteRepository<'a>
             created_at: Utc::now().timestamp(),
             updated_at: Utc::now().timestamp(),
             connected_app_id: params.connected_app_id.clone(),
+            jdm_transform: params.jdm_transform.clone(),
         };
 
-        sqlx::query("INSERT INTO entity_subscriptions (id, entity_sharing_id, created_at, updated_at, connected_app_id) VALUES ($1, $2, $3, $4, $5)")
+        sqlx::query("INSERT INTO entity_subscriptions (id, entity_sharing_id, created_at, updated_at, connected_app_id, jdm_transform) VALUES ($1, $2, $3, $4, $5, $6)")
         .bind(&entity_subscription.id)
         .bind(&entity_subscription.entity_sharing_id)
         .bind(&entity_subscription.created_at)
         .bind(&entity_subscription.updated_at)
         .bind(&entity_subscription.connected_app_id)
+        .bind(serde_json::to_string(&entity_subscription.jdm_transform).unwrap_or_else(|_| "".to_string()))
         .execute(self.pool)
         .await?;
 
@@ -45,6 +47,15 @@ impl<'a> EntitySubscriptionRepository for EntitySubscriptionSQLiteRepository<'a>
             sqlx::query_as("SELECT * FROM entity_subscriptions WHERE id = :id LIMIT 1")
                 .bind(id)
                 .fetch_one(self.pool)
+                .await?;
+        return Ok(result);
+    }
+
+    async fn get_all_entity_subscriptions_for_entity_sharing(&self, entity_sharing_id: &String) -> Result<Vec<EntitySubscription>, Error> {
+        let result: Vec<EntitySubscription> =
+            sqlx::query_as("SELECT * FROM entity_subscriptions WHERE entity_sharing_id = $1")
+                .bind(entity_sharing_id)
+                .fetch_all(self.pool)
                 .await?;
         return Ok(result);
     }

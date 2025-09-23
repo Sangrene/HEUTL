@@ -11,16 +11,16 @@ pub struct CreateEntitySharingParams {
     pub id: String,
     pub name: String,
     pub connected_app_id: String,
-    pub jdm_transform: Option<Value>,
     pub json_schema: Value,
     pub polling_infos: Option<EntitySharingPollingInfos>,
 }
 
 #[async_trait]
-pub trait EntitySharingRepository {
+pub trait EntitySharingRepository: Send + Sync {
     async fn create_entity_sharing(
         &self,
         params: &CreateEntitySharingParams,
     ) -> Result<EntitySharing, Error>;
     async fn get_entity_sharing(&self, id: &String) -> Result<EntitySharing, Error>;
+    async fn get_all_polling_entity_sharings(&self) -> Result<Vec<EntitySharing>, Error>;
 }

@@ -9,7 +9,7 @@ pub struct CreateConnectedAppParams {
 }
 
 #[async_trait]
-pub trait ConnectedAppRepository {
+pub trait ConnectedAppRepository: Send + Sync {
     async fn create_connected_app(&self, params: &CreateConnectedAppParams) -> Result<ConnectedApp, Error>;
     async fn get_connected_app(&self, id: &String) -> Result<ConnectedApp, Error>;
 }

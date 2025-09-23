@@ -4,14 +4,14 @@ use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, sqlx::FromRow)]
 pub struct EntitySharingPollingInfos {
-    polling_interval: u64,
-    polling_url: String,
-    polling_method: String,
-    polling_headers: HashMap<String, String>,
-    polling_body: String,
-    polling_timeout: u64,
-    polling_retries: u64,
-    polling_retry_delay: u64,
+    pub polling_interval: u64,
+    pub polling_url: String,
+    pub polling_method: String,
+    pub polling_headers: HashMap<String, String>,
+    pub polling_body: String,
+    pub polling_timeout: u64,
+    pub polling_retries: u64,
+    pub polling_retry_delay: u64,
 }
 
 impl From<String> for EntitySharingPollingInfos {
@@ -34,6 +34,5 @@ pub struct EntitySharing {
     pub created_at: i64,
     pub updated_at: i64,
     pub polling_infos: Option<EntitySharingPollingInfos>,
-    pub jdm_transform: Option<Value>,
     pub json_schema: Value,
 }

@@ -17,7 +17,7 @@ impl<'a> EntitySharingCore<'a> {
     ) -> Result<EntitySharing, Error> {
         let result = self
             .connected_app_core
-            .get_connected_app(&params.id)
+            .get_connected_app(&params.connected_app_id)
             .await
             .map(async move |_| {
                 self.entity_sharing_repository
@@ -30,5 +30,9 @@ impl<'a> EntitySharingCore<'a> {
 
     pub async fn get_entity_sharing(&self, id: &String) -> Result<EntitySharing, Error> {
         return self.entity_sharing_repository.get_entity_sharing(id).await;
+    }
+
+    pub async fn get_all_polling_entity_sharings(&self) -> Result<Vec<EntitySharing>, Error> {
+        return self.entity_sharing_repository.get_all_polling_entity_sharings().await;
     }
 }

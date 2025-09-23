@@ -36,4 +36,11 @@ impl<'a> EntitySubscriptionCore<'a> {
             .get_entity_subscription_by_id(id)
             .await;
     }
+
+    pub async fn get_all_entity_subscriptions_for_entity_sharing(&self, entity_sharing_id: &String) -> Result<Vec<EntitySubscription>, Error> {
+        return self
+            .entity_subscription_repository
+            .get_all_entity_subscriptions_for_entity_sharing(entity_sharing_id)
+            .await;
+    }
 }

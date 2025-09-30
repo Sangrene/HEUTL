@@ -17,6 +17,8 @@ pub struct EntitySharingDTO {
     pub updated_at: i64,
     pub polling_infos: Option<String>,
     pub json_schema: String,
+    pub data_path: Option<String>,
+    pub is_array: bool,
 }
 
 fn entity_sharing_dto_to_entity_sharing(
@@ -28,6 +30,8 @@ fn entity_sharing_dto_to_entity_sharing(
         connected_app_id: entity_sharing_dto.connected_app_id.clone(),
         created_at: entity_sharing_dto.created_at,
         updated_at: entity_sharing_dto.updated_at,
+        data_path: entity_sharing_dto.data_path,
+        is_array: entity_sharing_dto.is_array,
         // jdm_transform: match entity_sharing_dto.jdm_transform {
         //     Some(s) => serde_json::from_str(&s)?,
         //     None => None,
@@ -58,17 +62,21 @@ impl<'a> EntitySharingRepository for EntitySharingSQLiteRepository<'a> {
             created_at: Utc::now().timestamp(),
             updated_at: Utc::now().timestamp(),
             polling_infos: params.polling_infos.clone(),
+            data_path: params.data_path.clone(),
             json_schema: params.json_schema.clone(),
+            is_array: params.is_array,
         };
 
-        sqlx::query("INSERT INTO entity_sharings (id, name, created_at, updated_at, polling_infos, json_schema, connected_app_id) 
-        VALUES ($1, $2, $3, $4, json($5), json($6), $7)").bind(&entity_sharing.id)
+        sqlx::query("INSERT INTO entity_sharings (id, name, created_at, updated_at, polling_infos, json_schema, connected_app_id, data_path, is_array) 
+        VALUES ($1, $2, $3, $4, json($5), json($6), $7, $8, $9)").bind(&entity_sharing.id)
         .bind(&entity_sharing.name)
         .bind(&entity_sharing.created_at)
         .bind(&entity_sharing.updated_at)
         .bind(serde_json::to_string(&entity_sharing.polling_infos).unwrap())
         .bind(serde_json::to_string(&entity_sharing.json_schema).unwrap())
         .bind(&entity_sharing.connected_app_id)
+        .bind(&entity_sharing.data_path)
+        .bind(&entity_sharing.is_array)
         .execute(self.pool).await?;
         Ok(entity_sharing)
     }

@@ -12,7 +12,7 @@ use crate::shared::db::get_db;
 use crate::entity_sharing::entity_polling_handler::EntityPollingHandler;
 use crate::shared::bus::{Commands, TopicIds};
 use pubsub_bus::{EventBus, EventEmitter};
-use serde_json::json;
+use serde_json::{json, Value};
 use uuid::{Uuid, Timestamp, NoContext};
 use std::collections::HashMap;
 use chrono::{Timelike, Utc};
@@ -21,6 +21,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use tokio;
+use std::fs;
 
 mod connected_app;
 mod entity_sharing;
@@ -32,6 +33,8 @@ async fn test_scenario<'a>(
     entity_sharing_core: Arc<Mutex<EntitySharingCore<'a>>>,
     entity_subscription_core: Arc<EntitySubscriptionCore<'a>>,
 ) {
+    let file = fs::File::open("aptimize_test.json").expect("file should open read only");
+    let aptimize_jdm: Value = serde_json::from_reader(file).expect("file should be valid json");
     let ts = Timestamp::from_unix(
         NoContext,
         (Utc::now().timestamp() * 1000).try_into().unwrap(),
@@ -56,18 +59,13 @@ async fn test_scenario<'a>(
         .unwrap()
         .create_entity_sharing_with_polling(&CreateEntitySharingParams {
             id: Uuid::new_v7(ts).to_string(),
-            name: "asset".to_string(),
+            name: "Aptimize asset".to_string(),
             connected_app_id: aptimize_app.id.clone(),
-            json_schema: json!({}),
+            json_schema: aptimize_jdm,
+            data_path: Some("data".to_string()),
+            is_array: true,
             polling_infos: Some(EntitySharingPollingInfos {
-                polling_interval: 1,
-                polling_url: "https://api.app.aptimize.com".to_string(),
-                polling_method: "GET".to_string(),
-                polling_headers: HashMap::new(),
-                polling_body: "".to_string(),
-                polling_timeout: 1,
-                polling_retries: 1,
-                polling_retry_delay: 1,
+                polling_interval: 10000,
             }),
         })
         .await
@@ -78,24 +76,19 @@ async fn test_scenario<'a>(
         .unwrap()
         .create_entity_sharing_with_polling(&CreateEntitySharingParams {
             id: Uuid::new_v7(ts).to_string(),
-            name: "asset".to_string(),
+            name: "ArcFM asset".to_string(),
             connected_app_id: arcfm_app.id.clone(),
             json_schema: json!({}),
+            data_path: Some("assets".to_string()),
+            is_array: true,
             polling_infos: Some(EntitySharingPollingInfos {
-                polling_interval: 1,
-                polling_url: "https://arcfm.com".to_string(),
-                polling_method: "GET".to_string(),
-                polling_headers: HashMap::new(),
-                polling_body: "".to_string(),
-                polling_timeout: 1,
-                polling_retries: 1,
-                polling_retry_delay: 1,
+                polling_interval: 1000,
             }),
         })
         .await
         .unwrap();
 
-    let aptimize_subscription = entity_subscription_core
+    entity_subscription_core
         .create_entity_subscription(&CreateEntitySubscriptionParams {
             id: Uuid::new_v7(ts).to_string(),
             entity_sharing_id: arcfm_asset.id.clone(),
@@ -104,7 +97,7 @@ async fn test_scenario<'a>(
         })
         .await
         .unwrap();
-    let arcfm_subscription = entity_subscription_core
+    entity_subscription_core
         .create_entity_subscription(&CreateEntitySubscriptionParams {
             id: Uuid::new_v7(ts).to_string(),
             entity_sharing_id: aptimize_asset.id.clone(),
@@ -115,7 +108,12 @@ async fn test_scenario<'a>(
         .unwrap();
 }
 
-async fn run_app() {
+async fn init_app() -> (
+    Arc<ConnectedAppCore<'static>>,
+    Arc<Mutex<EntitySharingCore<'static>>>,
+    Arc<EntitySubscriptionCore<'static>>,
+    Arc<AtomicBool>,
+) {
     let bus: EventBus<Commands, TopicIds> = EventBus::new();
 
     let should_stop = Arc::new(AtomicBool::new(false));
@@ -140,7 +138,7 @@ async fn run_app() {
         Arc::clone(&app_core),
         entity_sharing_repository,
     )));
- 
+
     bus.add_publisher(&mut *entity_sharing_core.lock().unwrap(), None)
         .expect("Failed to add publisher");
 
@@ -157,6 +155,17 @@ async fn run_app() {
 
     bus.add_subscriber(entity_polling_handler);
 
+    (
+        app_core,
+        entity_sharing_core,
+        entity_subscription_core,
+        should_stop,
+    )
+}
+
+async fn run_app() {
+    let (app_core, entity_sharing_core, entity_subscription_core, should_stop) = init_app().await;
+
     test_scenario(
         Arc::clone(&app_core),
         Arc::clone(&entity_sharing_core),
@@ -165,7 +174,7 @@ async fn run_app() {
     .await;
 
     while !should_stop.load(Ordering::Relaxed) {
-        thread::sleep(Duration::from_secs(1));
+        thread::sleep(Duration::from_millis(1000));
     }
 }
 

@@ -13,6 +13,8 @@ pub struct CreateEntitySharingParams {
     pub connected_app_id: String,
     pub json_schema: Value,
     pub polling_infos: Option<EntitySharingPollingInfos>,
+    pub data_path: Option<String>,
+    pub is_array: bool,
 }
 
 #[async_trait]

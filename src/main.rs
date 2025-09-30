@@ -10,13 +10,17 @@ use crate::entity_subscription::entity_subscription_repository::CreateEntitySubs
 use crate::connected_app::connected_app_repository::CreateConnectedAppParams;
 use crate::shared::db::get_db;
 use crate::entity_sharing::entity_polling_handler::EntityPollingHandler;
+use crate::shared::bus::{Commands, TopicIds};
+use pubsub_bus::{EventBus, EventEmitter};
 use serde_json::json;
 use uuid::{Uuid, Timestamp, NoContext};
 use std::collections::HashMap;
 use chrono::{Timelike, Utc};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use actix;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
+use tokio;
 
 mod connected_app;
 mod entity_sharing;
@@ -24,9 +28,9 @@ mod entity_subscription;
 mod shared;
 
 async fn test_scenario<'a>(
-    app_core: &ConnectedAppCore<'a>,
-    entity_sharing_core: &EntitySharingCore<'a>,
-    entity_subscription_core: &EntitySubscriptionCore<'a>,
+    app_core: Arc<ConnectedAppCore<'a>>,
+    entity_sharing_core: Arc<Mutex<EntitySharingCore<'a>>>,
+    entity_subscription_core: Arc<EntitySubscriptionCore<'a>>,
 ) {
     let ts = Timestamp::from_unix(
         NoContext,
@@ -48,6 +52,8 @@ async fn test_scenario<'a>(
         .await
         .unwrap();
     let aptimize_asset = entity_sharing_core
+        .lock()
+        .unwrap()
         .create_entity_sharing_with_polling(&CreateEntitySharingParams {
             id: Uuid::new_v7(ts).to_string(),
             name: "asset".to_string(),
@@ -68,6 +74,8 @@ async fn test_scenario<'a>(
         .unwrap();
 
     let arcfm_asset = entity_sharing_core
+        .lock()
+        .unwrap()
         .create_entity_sharing_with_polling(&CreateEntitySharingParams {
             id: Uuid::new_v7(ts).to_string(),
             name: "asset".to_string(),
@@ -108,6 +116,8 @@ async fn test_scenario<'a>(
 }
 
 async fn run_app() {
+    let bus: EventBus<Commands, TopicIds> = EventBus::new();
+
     let should_stop = Arc::new(AtomicBool::new(false));
     let should_stop_clone = Arc::clone(&should_stop);
     ctrlc::set_handler(move || {
@@ -122,33 +132,44 @@ async fn run_app() {
     let entity_subscription_repository =
         Box::new(EntitySubscriptionSQLiteRepository { pool: pool });
 
-    let app_core = Box::leak(Box::new(ConnectedAppCore {
+    let app_core = Arc::new(ConnectedAppCore {
         connected_app_repository: connected_app_repository,
-    }));
-    let entity_sharing_core = Box::leak(Box::new(EntitySharingCore {
-        connected_app_core: app_core,
-        entity_sharing_repository: entity_sharing_repository,
-    }));
+    });
+    let entity_sharing_core = Arc::new(Mutex::new(EntitySharingCore::new(
+        EventEmitter::new(),
+        Arc::clone(&app_core),
+        entity_sharing_repository,
+    )));
+ 
+    bus.add_publisher(&mut *entity_sharing_core.lock().unwrap(), None)
+        .expect("Failed to add publisher");
 
-    let entity_subscription_core = Box::leak(Box::new(EntitySubscriptionCore {
+    let entity_subscription_core = Arc::new(EntitySubscriptionCore {
         entity_subscription_repository: entity_subscription_repository,
-        entity_sharing_core: entity_sharing_core,
-    }));
+        entity_sharing_core: Arc::clone(&entity_sharing_core),
+    });
 
-    let mut entity_polling_handler = EntityPollingHandler::new();
+    let entity_polling_handler = EntityPollingHandler::new(
+        Arc::clone(&entity_subscription_core),
+        Arc::clone(&entity_sharing_core),
+        Arc::clone(&should_stop),
+    );
 
-    test_scenario(app_core, entity_sharing_core, entity_subscription_core).await;
-    entity_polling_handler
-        .init_entity_sharings_polling(
-            &entity_subscription_core,
-            &entity_sharing_core,
-            &should_stop,
-        )
-        .await
-        .expect("Failed to initialize entity polling handler");
+    bus.add_subscriber(entity_polling_handler);
+
+    test_scenario(
+        Arc::clone(&app_core),
+        Arc::clone(&entity_sharing_core),
+        Arc::clone(&entity_subscription_core),
+    )
+    .await;
+
+    while !should_stop.load(Ordering::Relaxed) {
+        thread::sleep(Duration::from_secs(1));
+    }
 }
 
-#[actix::main]
+#[tokio::main]
 async fn main() {
     run_app().await;
 }

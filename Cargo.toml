@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-actix = "0.13.5"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 ctrlc = "3.4"
 jsonschema = "0.33.0"
+pubsub-bus = "3.1.0"
 reqwest = "0.12.23"
 serde = "1.0.225"
 serde_json = "1.0.145"

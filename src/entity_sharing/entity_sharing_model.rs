@@ -26,7 +26,7 @@ impl ToString for EntitySharingPollingInfos {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EntitySharing {
     pub id: String,
     pub name: String,

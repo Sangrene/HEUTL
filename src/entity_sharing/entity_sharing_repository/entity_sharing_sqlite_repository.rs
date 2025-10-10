@@ -19,6 +19,7 @@ pub struct EntitySharingDTO {
     pub json_schema: String,
     pub data_path: Option<String>,
     pub is_array: bool,
+    pub python_script: Option<String>,
 }
 
 fn entity_sharing_dto_to_entity_sharing(
@@ -41,6 +42,7 @@ fn entity_sharing_dto_to_entity_sharing(
             None => None,
         },
         json_schema: serde_json::from_str(&entity_sharing_dto.json_schema)?,
+        python_script: entity_sharing_dto.python_script,
     };
     return Ok(entity_sharing);
 }
@@ -65,10 +67,11 @@ impl<'a> EntitySharingRepository for EntitySharingSQLiteRepository<'a> {
             data_path: params.data_path.clone(),
             json_schema: params.json_schema.clone(),
             is_array: params.is_array,
+            python_script: params.python_script.clone(),
         };
 
-        sqlx::query("INSERT INTO entity_sharings (id, name, created_at, updated_at, polling_infos, json_schema, connected_app_id, data_path, is_array) 
-        VALUES ($1, $2, $3, $4, json($5), json($6), $7, $8, $9)").bind(&entity_sharing.id)
+        sqlx::query("INSERT INTO entity_sharings (id, name, created_at, updated_at, polling_infos, json_schema, connected_app_id, data_path, is_array, python_script) 
+        VALUES ($1, $2, $3, $4, json($5), json($6), $7, $8, $9, $10)").bind(&entity_sharing.id)
         .bind(&entity_sharing.name)
         .bind(&entity_sharing.created_at)
         .bind(&entity_sharing.updated_at)
@@ -77,6 +80,7 @@ impl<'a> EntitySharingRepository for EntitySharingSQLiteRepository<'a> {
         .bind(&entity_sharing.connected_app_id)
         .bind(&entity_sharing.data_path)
         .bind(&entity_sharing.is_array)
+        .bind(&entity_sharing.python_script)
         .execute(self.pool).await?;
         Ok(entity_sharing)
     }
@@ -100,5 +104,16 @@ impl<'a> EntitySharingRepository for EntitySharingSQLiteRepository<'a> {
             .map(entity_sharing_dto_to_entity_sharing)
             .collect::<Result<Vec<EntitySharing>, Error>>()?;
         return Ok(entity_sharings);
+    }
+
+    async fn get_all_entity_sharings(&self) -> Result<Vec<EntitySharing>, Error> {
+        let result: Vec<EntitySharingDTO> =
+            sqlx::query_as("SELECT * FROM entity_sharings")
+                .fetch_all(self.pool)
+                .await?;
+        return result
+            .into_iter()
+            .map(entity_sharing_dto_to_entity_sharing)
+            .collect::<Result<Vec<EntitySharing>, Error>>();
     }
 }

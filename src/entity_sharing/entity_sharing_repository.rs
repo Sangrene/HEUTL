@@ -15,6 +15,7 @@ pub struct CreateEntitySharingParams {
     pub polling_infos: Option<EntitySharingPollingInfos>,
     pub data_path: Option<String>,
     pub is_array: bool,
+    pub python_script: Option<String>,
 }
 
 #[async_trait]
@@ -25,4 +26,5 @@ pub trait EntitySharingRepository: Send + Sync {
     ) -> Result<EntitySharing, Error>;
     async fn get_entity_sharing(&self, id: &String) -> Result<EntitySharing, Error>;
     async fn get_all_polling_entity_sharings(&self) -> Result<Vec<EntitySharing>, Error>;
+    async fn get_all_entity_sharings(&self) -> Result<Vec<EntitySharing>, Error>;
 }

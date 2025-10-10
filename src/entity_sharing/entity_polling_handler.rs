@@ -4,9 +4,12 @@ use crate::entity_sharing::{
 use crate::entity_subscription::entity_subscription_core::EntitySubscriptionCore;
 use crate::shared::bus::{Commands, TopicIds};
 use crate::shared::errors::Error;
+use crate::shared::python_runner::run_python_script_output_json;
 use crate::shared::rule_engine::evaluate;
+use futures::future::join_all;
 use pubsub_bus::BusEvent;
 use pubsub_bus::Subscriber;
+use serde_json::{Value, json};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicBool, Ordering},
@@ -36,7 +39,7 @@ impl Subscriber<Commands, TopicIds> for EntityPollingHandler {
                     entity_subscription_core,
                     should_stop,
                 );
-                
+
                 self.handles.push(handle);
             }
             _ => {}
@@ -114,21 +117,36 @@ async fn run_entity_sharing_polling(
         return Ok(());
     }
 
-    println!("Starting entity sharing polling thread: {:?}", entity_sharing.name);
+    println!(
+        "Starting entity sharing polling thread: {:?}",
+        entity_sharing.name
+    );
     while !should_stop.load(Ordering::Relaxed) {
-        let _entity_subscriptions = entity_subscription_core
+        let entity_subscriptions = entity_subscription_core
             .get_all_entity_subscriptions_for_entity_sharing(&entity_sharing.id)
-            .await;
+            .await
+            .unwrap();
         if let Some(polling_infos) = &entity_sharing.polling_infos {
-            let response = evaluate(entity_sharing.json_schema.clone()).await;
-            if let Err(e) = response {
-                eprintln!("Error polling entity sharing: {:?} - {:?}", entity_sharing.name, e);
-                tokio::time::sleep(Duration::from_millis(10000)).await;
-                continue;
+            if let Some(python_script) = &entity_sharing.python_script {
+                //TODO: set the input of the python script
+                let result = match run_python_script_output_json(python_script, &json!({})) {
+                    Ok(result) => result,
+                    Err(e) => {
+                        eprintln!(
+                            "Error polling entity sharing: {:?} - {:?}",
+                            entity_sharing.name, e
+                        );
+                        tokio::time::sleep(Duration::from_millis(10000)).await;
+                        continue;
+                    }
+                };
+                join_all(entity_subscriptions.into_iter().map(async |sub| {
+                    entity_subscription_core
+                        .notify_subscription_of_new_entity_list(&sub, &result)
+                        .await;
+                }))
+                .await;
             }
-            let response = response.unwrap();
-
-            println!("Response for entity sharing {:?}: {:?}", entity_sharing.name, response);
             tokio::time::sleep(Duration::from_millis(polling_infos.polling_interval)).await;
         }
 

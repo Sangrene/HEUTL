@@ -15,4 +15,8 @@ impl<'a> ConnectedAppCore<'a> {
     pub async fn get_connected_app(&self, id: &String) -> Result<ConnectedApp, Error> {
         return self.connected_app_repository.get_connected_app(id).await;
     }
+
+    pub async fn get_all_connected_apps(&self) -> Result<Vec<ConnectedApp>, Error> {
+        return self.connected_app_repository.get_all_connected_apps().await;
+    }
 }

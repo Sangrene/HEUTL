@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, sqlx::FromRow)]
 pub struct EntitySharingPollingInfos {
@@ -30,4 +29,5 @@ pub struct EntitySharing {
     pub json_schema: Value,
     pub data_path: Option<String>,
     pub is_array: bool,
+    pub python_script: Option<String>,
 }

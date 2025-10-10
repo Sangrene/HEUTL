@@ -9,4 +9,6 @@ pub struct EntitySubscription {
     pub updated_at: i64,
     pub connected_app_id: String,
     pub jdm_transform: Option<Value>,
+    pub python_script: Option<String>,
+    
 }

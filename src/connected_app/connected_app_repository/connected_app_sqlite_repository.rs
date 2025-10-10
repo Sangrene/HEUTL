@@ -37,11 +37,20 @@ impl<'a> ConnectedAppRepository for ConnectedAppSQLiteRepository<'a> {
 
     async fn get_connected_app(&self, id: &String) -> Result<ConnectedApp, Error> {
         let connected_app: ConnectedApp = sqlx::query_as(
-            "SELECT id, name, created_at, updated_at FROM connected_apps WHERE id = $1 LIMIT 1",
+            "SELECT * FROM connected_apps WHERE id = $1 LIMIT 1",
         )
         .bind(id)
         .fetch_one(self.pool)
         .await?;
         Ok(connected_app)
+    }
+
+    async fn get_all_connected_apps(&self) -> Result<Vec<ConnectedApp>, Error> {
+        let connected_apps: Vec<ConnectedApp> = sqlx::query_as(
+            "SELECT * FROM connected_apps",
+        )
+        .fetch_all(self.pool)
+        .await?;
+        Ok(connected_apps)
     }
 }

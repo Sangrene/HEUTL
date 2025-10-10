@@ -8,24 +8,21 @@ use crate::entity_subscription::entity_subscription_core::EntitySubscriptionCore
 use crate::entity_subscription::entity_subscription_repository::entity_subscription_sqlite_repository::EntitySubscriptionSQLiteRepository;
 use crate::entity_subscription::entity_subscription_repository::CreateEntitySubscriptionParams;
 use crate::connected_app::connected_app_repository::CreateConnectedAppParams;
+use crate::services::web_api::run_web_api;
 use crate::shared::db::get_db;
 use crate::entity_sharing::entity_polling_handler::EntityPollingHandler;
 use crate::shared::bus::{Commands, TopicIds};
 use pubsub_bus::{EventBus, EventEmitter};
 use serde_json::{json, Value};
 use uuid::{Uuid, Timestamp, NoContext};
-use std::collections::HashMap;
 use chrono::{Timelike, Utc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
-use tokio;
-use std::fs;
 
 mod connected_app;
 mod entity_sharing;
 mod entity_subscription;
+mod services;
 mod shared;
 
 async fn test_scenario<'a>(
@@ -33,8 +30,6 @@ async fn test_scenario<'a>(
     entity_sharing_core: Arc<Mutex<EntitySharingCore<'a>>>,
     entity_subscription_core: Arc<EntitySubscriptionCore<'a>>,
 ) {
-    let file = fs::File::open("aptimize_test.json").expect("file should open read only");
-    let aptimize_jdm: Value = serde_json::from_reader(file).expect("file should be valid json");
     let ts = Timestamp::from_unix(
         NoContext,
         (Utc::now().timestamp() * 1000).try_into().unwrap(),
@@ -61,7 +56,8 @@ async fn test_scenario<'a>(
             id: Uuid::new_v7(ts).to_string(),
             name: "Aptimize asset".to_string(),
             connected_app_id: aptimize_app.id.clone(),
-            json_schema: aptimize_jdm,
+            json_schema: json!({}),
+            python_script: Some("result = [{\"name\": \"aptimize_asset1\"}]".to_string()),
             data_path: Some("data".to_string()),
             is_array: true,
             polling_infos: Some(EntitySharingPollingInfos {
@@ -79,6 +75,7 @@ async fn test_scenario<'a>(
             name: "ArcFM asset".to_string(),
             connected_app_id: arcfm_app.id.clone(),
             json_schema: json!({}),
+            python_script: Some("result = [{\"name\": \"arcfm_asset1\"}]".to_string()),
             data_path: Some("assets".to_string()),
             is_array: true,
             polling_infos: Some(EntitySharingPollingInfos {
@@ -94,6 +91,7 @@ async fn test_scenario<'a>(
             entity_sharing_id: arcfm_asset.id.clone(),
             connected_app_id: aptimize_app.id.clone(),
             jdm_transform: None,
+            python_script: None,
         })
         .await
         .unwrap();
@@ -103,6 +101,7 @@ async fn test_scenario<'a>(
             entity_sharing_id: aptimize_asset.id.clone(),
             connected_app_id: arcfm_app.id.clone(),
             jdm_transform: None,
+            python_script: None,
         })
         .await
         .unwrap();
@@ -173,12 +172,12 @@ async fn run_app() {
     )
     .await;
 
-    while !should_stop.load(Ordering::Relaxed) {
-        thread::sleep(Duration::from_millis(1000));
-    }
+    run_web_api(app_core, entity_sharing_core, entity_subscription_core)
+        .await
+        .expect("Failed to run web api");
 }
 
-#[tokio::main]
+#[actix_web::main]
 async fn main() {
     run_app().await;
 }

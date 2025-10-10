@@ -56,6 +56,10 @@ impl<'a> EntitySharingCore<'a> {
         return self.entity_sharing_repository.get_entity_sharing(id).await;
     }
 
+    pub async fn get_all_entity_sharings(&self) -> Result<Vec<EntitySharing>, Error> {
+        return self.entity_sharing_repository.get_all_entity_sharings().await;
+    }
+
     pub async fn get_all_polling_entity_sharings(&self) -> Result<Vec<EntitySharing>, Error> {
         return self
             .entity_sharing_repository

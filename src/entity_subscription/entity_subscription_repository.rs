@@ -9,6 +9,7 @@ pub struct CreateEntitySubscriptionParams {
     pub entity_sharing_id: String,
     pub connected_app_id: String,
     pub jdm_transform: Option<Value>,
+    pub python_script: Option<String>,
 }
 
 #[async_trait]

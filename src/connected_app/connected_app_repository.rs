@@ -12,5 +12,6 @@ pub struct CreateConnectedAppParams {
 pub trait ConnectedAppRepository: Send + Sync {
     async fn create_connected_app(&self, params: &CreateConnectedAppParams) -> Result<ConnectedApp, Error>;
     async fn get_connected_app(&self, id: &String) -> Result<ConnectedApp, Error>;
+    async fn get_all_connected_apps(&self) -> Result<Vec<ConnectedApp>, Error>;
 }
 

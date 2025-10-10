@@ -24,15 +24,17 @@ impl<'a> EntitySubscriptionRepository for EntitySubscriptionSQLiteRepository<'a>
             updated_at: Utc::now().timestamp(),
             connected_app_id: params.connected_app_id.clone(),
             jdm_transform: params.jdm_transform.clone(),
+            python_script: params.python_script.clone(),
         };
 
-        sqlx::query("INSERT INTO entity_subscriptions (id, entity_sharing_id, created_at, updated_at, connected_app_id, jdm_transform) VALUES ($1, $2, $3, $4, $5, $6)")
+        sqlx::query("INSERT INTO entity_subscriptions (id, entity_sharing_id, created_at, updated_at, connected_app_id, jdm_transform, python_script) VALUES ($1, $2, $3, $4, $5, $6, $7)")
         .bind(&entity_subscription.id)
         .bind(&entity_subscription.entity_sharing_id)
         .bind(&entity_subscription.created_at)
         .bind(&entity_subscription.updated_at)
         .bind(&entity_subscription.connected_app_id)
         .bind(serde_json::to_string(&entity_subscription.jdm_transform).unwrap_or_else(|_| "".to_string()))
+        .bind(&entity_subscription.python_script)
         .execute(self.pool)
         .await?;
 

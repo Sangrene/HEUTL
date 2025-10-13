@@ -3,7 +3,6 @@ use crate::entity_subscription::entity_subscription_model::EntitySubscription;
 use serde_json::Value;
 
 pub enum Commands {
-    
     EntitySharingCreated {
         entity_sharing: EntitySharing,
     },

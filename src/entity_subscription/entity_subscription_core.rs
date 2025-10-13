@@ -11,7 +11,7 @@ use futures::future;
 
 pub struct EntitySubscriptionCore<'a> {
     pub entity_subscription_repository: Box<dyn EntitySubscriptionRepository + 'a>,
-    pub entity_sharing_core: Arc<Mutex<EntitySharingCore<'a>>>,
+    pub entity_sharing_core: Arc<EntitySharingCore<'a>>,
 }
 
 impl<'a> EntitySubscriptionCore<'a> {
@@ -21,8 +21,6 @@ impl<'a> EntitySubscriptionCore<'a> {
     ) -> Result<EntitySubscription, Error> {
         let result = self
             .entity_sharing_core
-            .lock()
-            .unwrap()
             .get_entity_sharing(&params.entity_sharing_id)
             .await
             .map(async move |_| {

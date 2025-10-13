@@ -12,7 +12,7 @@ use crate::services::web_api::run_web_api;
 use crate::shared::db::get_db;
 use crate::entity_sharing::entity_polling_handler::EntityPollingHandler;
 use crate::shared::bus::{Commands, TopicIds};
-use pubsub_bus::{EventBus, EventEmitter};
+use pubsub_bus::{EventBus};
 use serde_json::{json, Value};
 use uuid::{Uuid, Timestamp, NoContext};
 use chrono::{Timelike, Utc};
@@ -27,7 +27,7 @@ mod shared;
 
 async fn test_scenario<'a>(
     app_core: Arc<ConnectedAppCore<'a>>,
-    entity_sharing_core: Arc<Mutex<EntitySharingCore<'a>>>,
+    entity_sharing_core: Arc<EntitySharingCore<'a>>,
     entity_subscription_core: Arc<EntitySubscriptionCore<'a>>,
 ) {
     let ts = Timestamp::from_unix(
@@ -50,8 +50,6 @@ async fn test_scenario<'a>(
         .await
         .unwrap();
     let aptimize_asset = entity_sharing_core
-        .lock()
-        .unwrap()
         .create_entity_sharing_with_polling(&CreateEntitySharingParams {
             id: Uuid::new_v7(ts).to_string(),
             name: "Aptimize asset".to_string(),
@@ -68,8 +66,6 @@ async fn test_scenario<'a>(
         .unwrap();
 
     let arcfm_asset = entity_sharing_core
-        .lock()
-        .unwrap()
         .create_entity_sharing_with_polling(&CreateEntitySharingParams {
             id: Uuid::new_v7(ts).to_string(),
             name: "ArcFM asset".to_string(),
@@ -109,12 +105,14 @@ async fn test_scenario<'a>(
 
 async fn init_app() -> (
     Arc<ConnectedAppCore<'static>>,
-    Arc<Mutex<EntitySharingCore<'static>>>,
+    Arc<EntitySharingCore<'static>>,
     Arc<EntitySubscriptionCore<'static>>,
     Arc<AtomicBool>,
 ) {
     let bus: EventBus<Commands, TopicIds> = EventBus::new();
-
+    let bus_static = Box::leak(Box::new(bus));
+    let publish =
+        Box::new(|command: Commands, topic_id: Option<TopicIds>| bus_static.publish(command, topic_id, 0));
     let should_stop = Arc::new(AtomicBool::new(false));
     let should_stop_clone = Arc::clone(&should_stop);
     ctrlc::set_handler(move || {
@@ -132,14 +130,11 @@ async fn init_app() -> (
     let app_core = Arc::new(ConnectedAppCore {
         connected_app_repository: connected_app_repository,
     });
-    let entity_sharing_core = Arc::new(Mutex::new(EntitySharingCore::new(
-        EventEmitter::new(),
+    let entity_sharing_core = Arc::new(EntitySharingCore::new(
         Arc::clone(&app_core),
         entity_sharing_repository,
-    )));
-
-    bus.add_publisher(&mut *entity_sharing_core.lock().unwrap(), None)
-        .expect("Failed to add publisher");
+        publish,
+    ));
 
     let entity_subscription_core = Arc::new(EntitySubscriptionCore {
         entity_subscription_repository: entity_subscription_repository,
@@ -152,7 +147,7 @@ async fn init_app() -> (
         Arc::clone(&should_stop),
     );
 
-    bus.add_subscriber(entity_polling_handler);
+    bus_static.add_subscriber(entity_polling_handler);
 
     (
         app_core,
@@ -177,7 +172,7 @@ async fn run_app() {
         .expect("Failed to run web api");
 }
 
-#[actix_web::main]
+#[tokio::main]
 async fn main() {
     run_app().await;
 }

@@ -1,78 +1,97 @@
 use crate::connected_app::connected_app_core::ConnectedAppCore;
 use crate::entity_sharing::entity_sharing_core::EntitySharingCore;
 use crate::entity_subscription::entity_subscription_core::EntitySubscriptionCore;
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, post, web};
-use serde_json::Value;
+use axum::{extract::{State, Path}, response::IntoResponse, routing::{get, post}, Json, Router, debug_handler};
+use reqwest::StatusCode;
+use tokio::net::TcpListener;
 use std::sync::{Arc, Mutex};
+use serde_json::Value;
+use std::io::Error;
+use tokio::signal;
 
-#[get("/")]
-async fn hello() -> impl Responder {
-    HttpResponse::Ok().body("Hello world!")
-}
 
-#[get("/connected-apps")]
-async fn get_connected_apps(web_app_cores: web::Data<WebAppCores>) -> impl Responder {
+#[debug_handler]
+async fn get_connected_apps(State(web_app_cores): State<WebAppCores>) -> impl IntoResponse {
     let connected_apps = web_app_cores
         .app_core
         .get_all_connected_apps()
         .await
         .unwrap();
-    HttpResponse::Ok().body(serde_json::to_string(&connected_apps).unwrap())
+    return (StatusCode::OK, Json(connected_apps));
 }
 
-#[get("/entity-sharings")]
-async fn get_entity_sharings(web_app_cores: web::Data<WebAppCores>) -> impl Responder {
+#[debug_handler]
+async fn get_entity_sharings(State(web_app_cores): State<WebAppCores>) -> impl IntoResponse {
     let entity_sharings = web_app_cores
         .entity_sharing_core
-        .lock()
-        .unwrap()
         .get_all_polling_entity_sharings()
         .await
         .unwrap();
-    HttpResponse::Ok().body(serde_json::to_string(&entity_sharings).unwrap())
+    return (StatusCode::OK, Json(entity_sharings));
 }
 
-#[post("/entity/{entity_sharing_id}")]
+#[debug_handler]
 async fn notify_new_entity_list(
-    web_app_cores: web::Data<WebAppCores>,
-    entity_sharing_id: web::Path<String>,
-    body: String
-) -> impl Responder {
-    let entity_sharing_id = entity_sharing_id.to_string();
-    let data = serde_json::from_str::<Value>(&body).unwrap();
+    State(web_app_cores): State<WebAppCores>,
+    Path(entity_sharing_id): Path<String>,
+    Json(data): Json<Value>,
+) -> impl IntoResponse {
     let result = web_app_cores
         .entity_subscription_core
         .notify_all_subscriptions_of_new_entity_list(&entity_sharing_id, &data)
         .await
         .unwrap();
 
-    return HttpResponse::Ok().body("ok");
+    return (StatusCode::OK, Json("ok"));
 }
 
+#[derive(Clone)]
 struct WebAppCores {
     pub app_core: Arc<ConnectedAppCore<'static>>,
-    pub entity_sharing_core: Arc<Mutex<EntitySharingCore<'static>>>,
+    pub entity_sharing_core: Arc<EntitySharingCore<'static>>,
     pub entity_subscription_core: Arc<EntitySubscriptionCore<'static>>,
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
 }
 
 pub async fn run_web_api(
     app_core: Arc<ConnectedAppCore<'static>>,
-    entity_sharing_core: Arc<Mutex<EntitySharingCore<'static>>>,
+    entity_sharing_core: Arc<EntitySharingCore<'static>>,
     entity_subscription_core: Arc<EntitySubscriptionCore<'static>>,
-) -> Result<(), std::io::Error> {
-    HttpServer::new(move || {
-        App::new()
-            .app_data(web::Data::new(WebAppCores {
-                app_core: app_core.clone(),
-                entity_sharing_core: entity_sharing_core.clone(),
-                entity_subscription_core: entity_subscription_core.clone(),
-            }))
-            .service(hello)
-            .service(get_connected_apps)
-            .service(get_entity_sharings)
-            .service(notify_new_entity_list)
-    })
-    .bind(("127.0.0.1", 8080))?
-    .run()
-    .await
+) -> Result<(), Error> {
+    let app = Router::new()
+    .route("/connected-apps", get(get_connected_apps))
+    .route("/entity-sharings", get(get_entity_sharings))
+    .route("/entity/{entity_sharing_id}", post(notify_new_entity_list))
+    .with_state(WebAppCores {
+        app_core,
+        entity_sharing_core,
+        entity_subscription_core,
+    });
+
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await?;
+    Ok(())
 }

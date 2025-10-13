@@ -23,7 +23,7 @@ pub struct EntityPollingHandler {
     handles: Vec<JoinHandle<()>>,
     should_stop: Arc<AtomicBool>,
     entity_subscription_core: Arc<EntitySubscriptionCore<'static>>,
-    entity_sharing_core: Arc<Mutex<EntitySharingCore<'static>>>,
+    entity_sharing_core: Arc<EntitySharingCore<'static>>,
 }
 
 impl Subscriber<Commands, TopicIds> for EntityPollingHandler {
@@ -57,7 +57,7 @@ impl Subscriber<Commands, TopicIds> for EntityPollingHandler {
 impl EntityPollingHandler {
     pub fn new(
         entity_subscription_core: Arc<EntitySubscriptionCore<'static>>,
-        entity_sharing_core: Arc<Mutex<EntitySharingCore<'static>>>,
+        entity_sharing_core: Arc<EntitySharingCore<'static>>,
         should_stop: Arc<AtomicBool>,
     ) -> Self {
         Self {
@@ -68,27 +68,25 @@ impl EntityPollingHandler {
         }
     }
 
-    pub async fn init_entity_sharings_polling(&mut self) -> Result<(), Error> {
-        let all_entity_sharings = self
-            .entity_sharing_core
-            .lock()
-            .unwrap()
-            .get_all_polling_entity_sharings()
-            .await?;
-        let should_stop = Arc::clone(&self.should_stop);
-        for entity_sharing in all_entity_sharings {
-            let handle = setup_new_entity_sharing_polling(
-                entity_sharing,
-                Arc::clone(&self.entity_subscription_core),
-                should_stop.clone(),
-            );
-            self.handles.push(handle);
-        }
-        for handle in self.handles.drain(..) {
-            handle.join().unwrap();
-        }
-        Ok(())
-    }
+    // pub async fn init_entity_sharings_polling(&mut self) -> Result<(), Error> {
+    //     let all_entity_sharings = self
+    //         .entity_sharing_core
+    //         .get_all_polling_entity_sharings()
+    //         .await?;
+    //     let should_stop = Arc::clone(&self.should_stop);
+    //     for entity_sharing in all_entity_sharings {
+    //         let handle = setup_new_entity_sharing_polling(
+    //             entity_sharing,
+    //             Arc::clone(&self.entity_subscription_core),
+    //             should_stop.clone(),
+    //         );
+    //         self.handles.push(handle);
+    //     }
+    //     for handle in self.handles.drain(..) {
+    //         handle.join().unwrap();
+    //     }
+    //     Ok(())
+    // }
 }
 
 fn setup_new_entity_sharing_polling(

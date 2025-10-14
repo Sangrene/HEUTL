@@ -17,7 +17,7 @@ use serde_json::{json, Value};
 use uuid::{Uuid, Timestamp, NoContext};
 use chrono::{Timelike, Utc};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 
 mod connected_app;
 mod entity_sharing;

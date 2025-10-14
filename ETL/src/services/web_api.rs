@@ -4,7 +4,7 @@ use crate::entity_subscription::entity_subscription_core::EntitySubscriptionCore
 use axum::{extract::{State, Path}, response::IntoResponse, routing::{get, post}, Json, Router, debug_handler};
 use reqwest::StatusCode;
 use tokio::net::TcpListener;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use serde_json::Value;
 use std::io::Error;
 use tokio::signal;

@@ -11,7 +11,7 @@ use pubsub_bus::BusEvent;
 use pubsub_bus::Subscriber;
 use serde_json::{Value, json};
 use std::sync::{
-    Arc, Mutex,
+    Arc,
     atomic::{AtomicBool, Ordering},
 };
 use std::thread;
@@ -141,7 +141,7 @@ async fn run_entity_sharing_polling(
                 join_all(entity_subscriptions.into_iter().map(async |sub| {
                     entity_subscription_core
                         .notify_subscription_of_new_entity_list(&sub, &result)
-                        .await;
+                        .await
                 }))
                 .await;
             }

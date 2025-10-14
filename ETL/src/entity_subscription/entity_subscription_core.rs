@@ -5,9 +5,9 @@ use crate::entity_subscription::entity_subscription_repository::{
 };
 use crate::shared::errors::Error;
 use crate::shared::python_runner::run_python_script_output_json;
-use serde_json::Value;
-use std::sync::{Arc, Mutex};
 use futures::future;
+use serde_json::Value;
+use std::sync::Arc;
 
 pub struct EntitySubscriptionCore<'a> {
     pub entity_subscription_repository: Box<dyn EntitySubscriptionRepository + 'a>,
@@ -48,14 +48,15 @@ impl<'a> EntitySubscriptionCore<'a> {
         &self,
         entity_sharing_id: &String,
         data: &Value,
-    ) -> Result<Vec<()>, Error> {
+    ) -> Result<Vec<Result<(), Error>>, Error> {
         let entity_subscriptions = self
             .get_all_entity_subscriptions_for_entity_sharing(entity_sharing_id)
             .await?;
         let result = future::join_all(entity_subscriptions.into_iter().map(async |sub| {
             self.notify_subscription_of_new_entity_list(&sub, data)
-                .await;
-        })).await;
+                .await
+        }))
+        .await;
         return Ok(result);
     }
 

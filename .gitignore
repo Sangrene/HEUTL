@@ -1,4 +1,4 @@
-/target
+*/target
 *.json
 .venv
 .env

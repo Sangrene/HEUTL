@@ -9,27 +9,29 @@ use std::sync::{Arc, RwLock};
 
 use crate::shared::LoadingState;
 
-#[derive(Clone)]
-struct EntitySharingsWidget {
+#[derive(Clone, Debug, Default)]
+pub struct EntitySharingsWidget {
     state: Arc<RwLock<EntitySharingsState>>,
 }
 
+#[derive(Debug, Default)]
 struct EntitySharingsState {
+
     loading_state: LoadingState,
     entity_sharings: Vec<EntitySharing>,
     list_state: ListState,
 }
 
 #[derive(Debug, serde::Deserialize, Clone)]
-struct EntitySharing {
+pub struct EntitySharing {
     name: String,
-    id: String,
-    created_at: String,
-    updated_at: String,
+    pub id: String,
+    created_at: i64,
+    updated_at: i64,
 }
 
 async fn query_entity_sharings() -> Result<Vec<EntitySharing>, String> {
-    let result = reqwest::get("http://localhost:8000/entity_sharings")
+    let result = reqwest::get("http://localhost:8080/entity-sharings")
         .await
         .map_err(|e| e.to_string())?;
     let body = result.text().await.map_err(|e| e.to_string())?;
@@ -39,7 +41,7 @@ async fn query_entity_sharings() -> Result<Vec<EntitySharing>, String> {
 }
 
 impl EntitySharingsWidget {
-    fn run(&self) {
+    pub fn run(&self) {
         let this = self.clone();
         tokio::spawn(this.fetch_entity_sharings());
     }
@@ -62,6 +64,18 @@ impl EntitySharingsWidget {
             }
         }
     }
+
+    pub fn scroll_down(&self) -> Option<EntitySharing> {
+        let mut state = self.state.write().unwrap();
+        state.list_state.scroll_down_by(1);
+        return Some(state.entity_sharings[state.list_state.selected().unwrap()].clone());
+    }
+
+    pub fn scroll_up(&self) -> Option<EntitySharing> {
+        let mut state = self.state.write().unwrap();
+        state.list_state.scroll_up_by(1);
+        return Some(state.entity_sharings[state.list_state.selected().unwrap()].clone());
+    }
 }
 
 impl Widget for &EntitySharingsWidget {
@@ -80,7 +94,7 @@ impl Widget for &EntitySharingsWidget {
                 .map(|sharing| ListItem::from(format!("{}", sharing.name))),
         )
         .block(block)
-        .highlight_symbol(">>");
+        .highlight_symbol(">> ");
 
         return StatefulWidget::render(list, area, buf, &mut state.list_state);
     }

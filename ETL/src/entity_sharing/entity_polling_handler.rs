@@ -1,15 +1,12 @@
-use crate::entity_sharing::{
-    entity_sharing_core::EntitySharingCore, entity_sharing_model::EntitySharing,
-};
+use crate::entity_sharing::entity_sharing_model::EntitySharing;
 use crate::entity_subscription::entity_subscription_core::EntitySubscriptionCore;
 use crate::shared::bus::{Commands, TopicIds};
 use crate::shared::errors::Error;
 use crate::shared::python_runner::run_python_script_output_json;
-use crate::shared::rule_engine::evaluate;
 use futures::future::join_all;
 use pubsub_bus::BusEvent;
 use pubsub_bus::Subscriber;
-use serde_json::{Value, json};
+use serde_json::json;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -18,12 +15,16 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use tokio;
+use tokio::sync::broadcast;
 
 pub struct EntityPollingHandler {
     handles: Vec<JoinHandle<()>>,
     should_stop: Arc<AtomicBool>,
     entity_subscription_core: Arc<EntitySubscriptionCore<'static>>,
-    entity_sharing_core: Arc<EntitySharingCore<'static>>,
+    channel: (
+        broadcast::Sender<EntitySharing>,
+        broadcast::Receiver<EntitySharing>,
+    ),
 }
 
 impl Subscriber<Commands, TopicIds> for EntityPollingHandler {
@@ -38,9 +39,13 @@ impl Subscriber<Commands, TopicIds> for EntityPollingHandler {
                     entity_sharing,
                     entity_subscription_core,
                     should_stop,
+                    self.channel.0.subscribe()
                 );
 
                 self.handles.push(handle);
+            }
+            Commands::EntitySharingUpdated { entity_sharing } => {
+                self.channel.0.send(entity_sharing.clone()).unwrap();
             }
             _ => {}
         }
@@ -49,6 +54,7 @@ impl Subscriber<Commands, TopicIds> for EntityPollingHandler {
     fn is_subscribed_to(&self, topic_id: &TopicIds) -> bool {
         match topic_id {
             TopicIds::EntitySharingCreated => true,
+            TopicIds::EntitySharingUpdated => true,
             _ => false,
         }
     }
@@ -57,42 +63,22 @@ impl Subscriber<Commands, TopicIds> for EntityPollingHandler {
 impl EntityPollingHandler {
     pub fn new(
         entity_subscription_core: Arc<EntitySubscriptionCore<'static>>,
-        entity_sharing_core: Arc<EntitySharingCore<'static>>,
         should_stop: Arc<AtomicBool>,
     ) -> Self {
         Self {
             handles: vec![],
             entity_subscription_core,
-            entity_sharing_core,
             should_stop,
+            channel: broadcast::channel(16),
         }
     }
-
-    // pub async fn init_entity_sharings_polling(&mut self) -> Result<(), Error> {
-    //     let all_entity_sharings = self
-    //         .entity_sharing_core
-    //         .get_all_polling_entity_sharings()
-    //         .await?;
-    //     let should_stop = Arc::clone(&self.should_stop);
-    //     for entity_sharing in all_entity_sharings {
-    //         let handle = setup_new_entity_sharing_polling(
-    //             entity_sharing,
-    //             Arc::clone(&self.entity_subscription_core),
-    //             should_stop.clone(),
-    //         );
-    //         self.handles.push(handle);
-    //     }
-    //     for handle in self.handles.drain(..) {
-    //         handle.join().unwrap();
-    //     }
-    //     Ok(())
-    // }
 }
 
 fn setup_new_entity_sharing_polling(
     entity_sharing: EntitySharing,
     entity_subscription_core: Arc<EntitySubscriptionCore<'static>>,
     should_stop: Arc<AtomicBool>,
+    receiver: broadcast::Receiver<EntitySharing>,
 ) -> JoinHandle<()> {
     thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
@@ -100,6 +86,7 @@ fn setup_new_entity_sharing_polling(
             entity_sharing,
             entity_subscription_core,
             &should_stop,
+            receiver,
         )) {
             eprintln!("Error in entity sharing polling: {:?}", e);
         }
@@ -107,9 +94,10 @@ fn setup_new_entity_sharing_polling(
 }
 
 async fn run_entity_sharing_polling(
-    entity_sharing: EntitySharing,
+    mut entity_sharing: EntitySharing,
     entity_subscription_core: Arc<EntitySubscriptionCore<'static>>,
     should_stop: &Arc<AtomicBool>,
+    mut receiver: broadcast::Receiver<EntitySharing>,
 ) -> Result<(), Error> {
     if entity_sharing.polling_infos.is_none() {
         return Ok(());
@@ -120,6 +108,12 @@ async fn run_entity_sharing_polling(
         entity_sharing.name
     );
     while !should_stop.load(Ordering::Relaxed) {
+        if !receiver.is_empty() {
+            if let Ok(new_entity_sharing) = receiver.recv().await {
+                entity_sharing = new_entity_sharing;
+            }
+        }
+        
         let entity_subscriptions = entity_subscription_core
             .get_all_entity_subscriptions_for_entity_sharing(&entity_sharing.id)
             .await

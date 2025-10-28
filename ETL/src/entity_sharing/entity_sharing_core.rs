@@ -63,6 +63,12 @@ impl<'a> EntitySharingCore<'a> {
             .entity_sharing_repository
             .update_entity_sharing(&updated_entity_sharing)
             .await?;
+        (self.publish)(
+            Commands::EntitySharingUpdated {
+                entity_sharing: updated_entity_sharing.clone(),
+            },
+            Some(TopicIds::EntitySharingUpdated),
+        );
         return Ok(updated_entity_sharing);
     }
 

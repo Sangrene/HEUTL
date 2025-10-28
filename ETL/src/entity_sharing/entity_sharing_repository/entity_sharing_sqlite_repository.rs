@@ -64,13 +64,14 @@ impl<'a> EntitySharingRepository for EntitySharingSQLiteRepository<'a> {
         };
 
         sqlx::query("INSERT INTO entity_sharings (id, name, created_at, updated_at, polling_infos, json_schema, connected_app_id, is_array, python_script) 
-        VALUES ($1, $2, $3, $4, json($5), json($6), $7, $8, $9, $10)").bind(&entity_sharing.id)
+        VALUES ($1, $2, $3, $4, json($5), json($6), $7, $8, $9)").bind(&entity_sharing.id)
         .bind(&entity_sharing.name)
         .bind(&entity_sharing.created_at)
         .bind(&entity_sharing.updated_at)
         .bind(serde_json::to_string(&entity_sharing.polling_infos).unwrap())
         .bind(serde_json::to_string(&entity_sharing.json_schema).unwrap())
         .bind(&entity_sharing.connected_app_id)
+        .bind(&entity_sharing.is_array)
         .bind(&entity_sharing.python_script)
         .execute(self.pool).await?;
         Ok(entity_sharing)

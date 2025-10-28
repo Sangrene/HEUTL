@@ -51,7 +51,7 @@ async fn test_scenario<'a>(
         .unwrap();
     let aptimize_asset = entity_sharing_core
         .create_entity_sharing(&CreateEntitySharingParams {
-            id: Uuid::new_v7(ts).to_string(),
+            id: "423f9ce6-acc0-7fe9-9ef6-270b1e7acb78".to_string(),
             name: "Aptimize asset".to_string(),
             connected_app_id: aptimize_app.id.clone(),
             json_schema: json!({}),
@@ -66,7 +66,7 @@ async fn test_scenario<'a>(
 
     let arcfm_asset = entity_sharing_core
         .create_entity_sharing(&CreateEntitySharingParams {
-            id: Uuid::new_v7(ts).to_string(),
+            id: "423f9ce6-acc0-7a23-a8d4-8d8ab7a1ad39".to_string(),
             name: "ArcFM asset".to_string(),
             connected_app_id: arcfm_app.id.clone(),
             json_schema: json!({}),
@@ -109,8 +109,9 @@ async fn init_app() -> (
 ) {
     let bus: EventBus<Commands, TopicIds> = EventBus::new();
     let bus_static = Box::leak(Box::new(bus));
-    let publish =
-        Box::new(|command: Commands, topic_id: Option<TopicIds>| bus_static.publish(command, topic_id, 0));
+    let publish = Box::new(|command: Commands, topic_id: Option<TopicIds>| {
+        bus_static.publish(command, topic_id, 0)
+    });
     let should_stop = Arc::new(AtomicBool::new(false));
     let should_stop_clone = Arc::clone(&should_stop);
     ctrlc::set_handler(move || {
@@ -141,7 +142,6 @@ async fn init_app() -> (
 
     let entity_polling_handler = EntityPollingHandler::new(
         Arc::clone(&entity_subscription_core),
-        Arc::clone(&entity_sharing_core),
         Arc::clone(&should_stop),
     );
 

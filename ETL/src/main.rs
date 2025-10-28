@@ -50,13 +50,12 @@ async fn test_scenario<'a>(
         .await
         .unwrap();
     let aptimize_asset = entity_sharing_core
-        .create_entity_sharing_with_polling(&CreateEntitySharingParams {
+        .create_entity_sharing(&CreateEntitySharingParams {
             id: Uuid::new_v7(ts).to_string(),
             name: "Aptimize asset".to_string(),
             connected_app_id: aptimize_app.id.clone(),
             json_schema: json!({}),
             python_script: Some("result = [{\"name\": \"aptimize_asset1\"}]".to_string()),
-            data_path: Some("data".to_string()),
             is_array: true,
             polling_infos: Some(EntitySharingPollingInfos {
                 polling_interval: 10000,
@@ -66,13 +65,12 @@ async fn test_scenario<'a>(
         .unwrap();
 
     let arcfm_asset = entity_sharing_core
-        .create_entity_sharing_with_polling(&CreateEntitySharingParams {
+        .create_entity_sharing(&CreateEntitySharingParams {
             id: Uuid::new_v7(ts).to_string(),
             name: "ArcFM asset".to_string(),
             connected_app_id: arcfm_app.id.clone(),
             json_schema: json!({}),
             python_script: Some("result = [{\"name\": \"arcfm_asset1\"}]".to_string()),
-            data_path: Some("assets".to_string()),
             is_array: true,
             polling_infos: Some(EntitySharingPollingInfos {
                 polling_interval: 1000,

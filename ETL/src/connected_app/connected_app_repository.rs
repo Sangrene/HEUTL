@@ -1,8 +1,10 @@
 use crate::connected_app::connected_app_model::ConnectedApp;
 use crate::shared::errors::Error;
 use async_trait::async_trait;   
+use serde::{Deserialize, Serialize};
 pub mod connected_app_sqlite_repository;
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct CreateConnectedAppParams {
     pub id: String,
     pub name: String,

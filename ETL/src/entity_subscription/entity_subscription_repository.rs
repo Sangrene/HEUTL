@@ -3,7 +3,9 @@ use crate::shared::errors::Error;
 use async_trait::async_trait;
 use serde_json::Value;
 pub mod entity_subscription_sqlite_repository;
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct CreateEntitySubscriptionParams {
     pub id: String,
     pub entity_sharing_id: String,

@@ -3,3 +3,4 @@ pub mod db;
 pub mod errors;
 pub mod rule_engine;
 pub mod python_runner;
+pub mod merge_struct;

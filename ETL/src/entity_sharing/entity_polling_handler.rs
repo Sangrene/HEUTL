@@ -110,7 +110,9 @@ async fn run_entity_sharing_polling(
     while !should_stop.load(Ordering::Relaxed) {
         if !receiver.is_empty() {
             if let Ok(new_entity_sharing) = receiver.recv().await {
-                entity_sharing = new_entity_sharing;
+                if new_entity_sharing.id.eq(&entity_sharing.id) {
+                    entity_sharing = new_entity_sharing;
+                }
             }
         }
         

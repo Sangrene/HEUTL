@@ -43,12 +43,18 @@ impl<'a> EntitySharingCore<'a> {
                     .await
             })?
             .await?;
-        (self.publish)(
-            Commands::EntitySharingCreated {
-                entity_sharing: (result.clone()),
-            },
-            Some(TopicIds::EntitySharingCreated),
-        );
+        match result.polling_infos {
+            Some(_) => {
+                (self.publish)(
+                    Commands::EntitySharingCreated {
+                        entity_sharing: (result.clone()),
+                    },
+                    Some(TopicIds::EntitySharingCreated),
+                );
+            }
+            None => {}
+        }
+
         return Ok(result);
     }
 
@@ -63,12 +69,17 @@ impl<'a> EntitySharingCore<'a> {
             .entity_sharing_repository
             .update_entity_sharing(&updated_entity_sharing)
             .await?;
-        (self.publish)(
-            Commands::EntitySharingUpdated {
-                entity_sharing: updated_entity_sharing.clone(),
-            },
-            Some(TopicIds::EntitySharingUpdated),
-        );
+        match updated_entity_sharing.polling_infos {
+            Some(_) => {
+                (self.publish)(
+                    Commands::EntitySharingUpdated {
+                        entity_sharing: updated_entity_sharing.clone(),
+                    },
+                    Some(TopicIds::EntitySharingUpdated),
+                );
+            }
+            None => {}
+        }
         return Ok(updated_entity_sharing);
     }
 
